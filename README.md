@@ -8,12 +8,12 @@ with exactly one file replaced: `files/lib/wine/x86_64-windows/dwrite.dll`,
 rebuilt from the Wine source that GE release is based on, with
 [`patches/`](patches/) applied. Everything else is GE's build, untouched.
 
-**Not affiliated with GloriousEggroll, Valve or CCP.** Report problems with
+**Not affiliated with GloriousEggroll, Valve or CCP/Fenris Creations.** Report problems with
 these builds here, not to GE.
 
 ## The problem
 
-The missions page in the KEEP Monitor loads a web font
+The KEEP Monitor loads a web font
 (`FavoritMonoStd-Light.woff2`) whose style name is empty. Windows' DirectWrite
 copes with that. Wine's crashes on it, which leaves the in-game browser blank
 or stuck on "Initializing" under every Proton version tested (GE-Proton9-27,
@@ -26,23 +26,23 @@ are not affected. The details are in the
 [patch description](patches/0001-dwrite-synthesize-empty-face-name.patch).
 
 The proper fix is for the font to have a style name; that has been reported
-to CCP, and we plan to offer the patch upstream. Once either lands, this
+to CCP/FC, and we plan to offer the patch upstream. Once either lands, this
 project is no longer needed.
 
 ## Install
 
-Download `GE-ProtonX-Y-FrontierN.tar.gz` and its `.sha512sum` from
+Download `GE-ProtonX-Y-Frontier-vA.B.C.tar.gz` and its `.sha512sum` from
 [Releases](../../releases), then:
 
 ```sh
-sha512sum -c GE-Proton11-7-Frontier1.sha512sum
-tar -xf GE-Proton11-7-Frontier1.tar.gz -C ~/.local/share/Steam/compatibilitytools.d/
+sha512sum -c GE-Proton11-7-Frontier-v0.1.0.sha512sum
+tar -xf GE-Proton11-7-Frontier-v0.1.0.tar.gz -C ~/.local/share/Steam/compatibilitytools.d/
 ```
 
 The tarball works on any distribution; Proton brings its own runtime.
 
 - **Lutris:** restart Lutris, then EVE Frontier → *Configure* → *Runner
-  options* → *Wine version* → `GE-Proton11-7-Frontier1`.
+  options* → *Wine version* → `GE-Proton11-7-Frontier-v0.1.0`.
 - **Steam:** restart Steam and pick it under the game's *Compatibility*
   settings.
 
@@ -55,7 +55,7 @@ Releases are built by this repository's GitHub Actions workflow, which records
 signed build provenance for each tarball:
 
 ```sh
-gh attestation verify GE-Proton11-7-Frontier1.tar.gz --repo setkeh/GE-Proton-Frontier
+gh attestation verify GE-Proton11-7-Frontier-v0.1.0.tar.gz --repo setkeh/GE-Proton-Frontier
 ```
 
 Every tarball also contains `frontier/BUILDINFO` (the GE release and its
@@ -84,8 +84,8 @@ checks it against the hash recorded there.
 Everything runs in the flake's dev shell, the same toolchain CI uses:
 
 ```sh
-nix develop -c scripts/build.sh GE-Proton11-7-Frontier1
-nix develop -c scripts/test.sh  GE-Proton11-7-Frontier1 [path/to/stock/GE-Proton11-7]
+nix develop -c scripts/build.sh GE-Proton11-7-Frontier-v0.1.0
+nix develop -c scripts/test.sh  GE-Proton11-7-Frontier-v0.1.0 [path/to/stock/GE-Proton11-7]
 ```
 
 `build.sh` downloads the GE release (checked against GE's sha512), reads the
@@ -99,8 +99,12 @@ Only the 64-bit `dwrite.dll` is rebuilt; EVE Frontier's browser is 64-bit.
 
 ## Releasing
 
-1. Tag `GE-ProtonX-Y-FrontierN` and push the tag. `N` starts at 1 for each GE
-   release and goes up when only our patches change.
+1. Tag `GE-ProtonX-Y-Frontier-vA.B.C` (signed) and push the tag. `GE-ProtonX-Y`
+   is the GE release it is built on; `vA.B.C` is this project's version:
+   - **patch** (0.1.x): packaging or build fixes; same Wine patch, same GE base.
+   - **minor** (0.x.0): rebased on a new GE release, or the Wine patch changed.
+   - **major** (x.0.0): reserved for 1.0.
+   A suffix such as `-rc1` builds a pre-release.
 2. The workflow builds the tarball, attests it and attaches it to a **draft**
    release.
 3. Download the draft's tarball into `dist/`, run `scripts/test.sh` against

@@ -6,18 +6,20 @@
 # applied, swaps it in, renames the tool and re-packs it. Nothing else in
 # GE's build is touched, so a release is "GE-Proton, plus one DLL".
 #
-# Usage:   scripts/build.sh GE-Proton11-7-Frontier1
+# Usage:   scripts/build.sh GE-Proton11-7-Frontier-v0.1.0
 # Output:  dist/<tag>.tar.gz, dist/<tag>.sha512sum, dist/BUILDINFO
 #
 # Run it inside `nix develop` so the toolchain matches CI. Downloads are
 # cached in work/ and re-verified on every run.
 set -euo pipefail
 
-TAG=${1:?usage: scripts/build.sh GE-ProtonX-Y-FrontierN}
-# The tag carries the GE release it is built on. Anything else is a mistake,
-# and failing here beats publishing a release built on the wrong GE version.
-if [[ ! $TAG =~ ^(GE-Proton[0-9]+-[0-9]+)-Frontier([0-9]+)$ ]]; then
-    echo "error: tag '$TAG' is not of the form GE-ProtonX-Y-FrontierN" >&2
+TAG=${1:?usage: scripts/build.sh GE-ProtonX-Y-Frontier-vA.B.C}
+# The tag carries the GE release it is built on and our own semantic
+# version, optionally with a pre-release suffix (-rc1). Anything else is a
+# mistake, and failing here beats publishing a release built on the wrong GE
+# version.
+if [[ ! $TAG =~ ^(GE-Proton[0-9]+-[0-9]+)-Frontier-v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+    echo "error: tag '$TAG' is not of the form GE-ProtonX-Y-Frontier-vA.B.C[-pre]" >&2
     exit 1
 fi
 GE_TAG=${BASH_REMATCH[1]}

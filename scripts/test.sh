@@ -5,7 +5,7 @@
 # EVE Frontier's web font), then runs the probe against the built tool. Pass
 # a stock GE-Proton directory as well to confirm the font still breaks it.
 #
-# Usage:   scripts/test.sh GE-Proton11-7-Frontier1 [path/to/stock/GE-Proton]
+# Usage:   scripts/test.sh GE-Proton11-7-Frontier-v0.1.0 [path/to/stock/GE-Proton]
 # Needs:   `nix develop` (compiler, test font) and umu-run on PATH.
 set -euo pipefail
 
