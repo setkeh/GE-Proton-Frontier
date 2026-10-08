@@ -1,0 +1,40 @@
+dwrite: Synthesize an empty face name when a font has none.
+
+A font whose only subfamily name record (nameID 2) is zero-length ends up
+with no face name strings: heap_strdupnW() returns NULL for a zero-length
+string, add_localizedstring() rejects it, and opentype_get_font_facename()
+returns names == NULL. init_font_data() then passes data->names to
+fontstrings_get_en_string(), which calls FindLocaleName() on it and
+faults on the NULL object. Any font collection that includes such a font
+crashes, e.g. in CreateFontCollectionFromFontSet().
+
+Give such fonts an empty en-us face name and let the existing
+differentiation rules add weight, stretch and style terms to it, the same
+way they handle a face name with no style terms. A non-regular font gets a
+name such as "Light"; a regular one keeps the empty name. Only fonts that
+would otherwise have no face name take this path.
+
+Seen with the ABC Favorit Mono Light web font served to EVE Frontier's
+in-game browser, which loads it without trouble on Windows.
+
+---
+--- a/dlls/dwrite/font.c
++++ b/dlls/dwrite/font.c
+@@ -4353,6 +4353,17 @@
+     opentype_get_font_metrics(&stream_desc, &data->metrics, NULL);
+     opentype_get_font_facename(&stream_desc, props.lf.lfFaceName, &data->names);
+ 
++    /* Fonts with an empty subfamily name still need a face name; let the rules below derive it. */
++    if (!data->names)
++    {
++        if (FAILED(hr = create_localizedstrings(&data->names))
++                || FAILED(hr = add_localizedstring(data->names, L"en-us", L"")))
++        {
++            release_font_data(data);
++            return hr;
++        }
++    }
++
+     if (FAILED(hr = opentype_get_font_familyname(&stream_desc, family_model, &data->family_names)))
+     {
+         WARN("Unable to get family name from the font file, hr %#lx.\n", hr);

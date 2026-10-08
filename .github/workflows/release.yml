@@ -1,0 +1,97 @@
+name: Release
+
+# Builds a release from a tag and attaches it to a draft GitHub release.
+#
+# The tag names the GE release it is built on: GE-Proton11-7-Frontier1 is
+# GE-Proton11-7 plus our patches, revision 1. Bump the FrontierN suffix when
+# only the patches change; a new GE release starts again at Frontier1.
+#
+# The release is left as a draft on purpose: publish it only after
+# scripts/test.sh and an in-game check pass on the built tarball.
+# workflow_dispatch rebuilds an existing tag, replacing its assets.
+on:
+  push:
+    # Broader than the accepted format so a mistyped tag fails loudly in the
+    # guard below instead of silently not building.
+    tags: ['GE-Proton*', 'v*', '[0-9]*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to rebuild, e.g. GE-Proton11-7-Frontier1'
+        required: true
+
+jobs:
+  release:
+    name: Build and draft release
+    runs-on: ubuntu-latest
+    permissions:
+      # contents: create the release and upload assets with GITHUB_TOKEN.
+      # id-token + attestations: build provenance for the tarball.
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+    steps:
+      - name: Check tag format
+        run: |
+          if [[ ! $TAG =~ ^GE-Proton[0-9]+-[0-9]+-Frontier[0-9]+$ ]]; then
+            echo "::error::Tag '$TAG' is not of the form GE-ProtonX-Y-FrontierN"
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.TAG }}
+
+      # The dev shell pins the toolchain in flake.lock, so CI and a local
+      # `nix develop -c scripts/build.sh` compile with the same compiler.
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
+
+      - name: Build
+        run: |
+          # Timestamps in the tarball come from the tagged commit, so a
+          # rebuild of the same tag packs files with the same dates.
+          SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+          export SOURCE_DATE_EPOCH
+          nix develop -c scripts/build.sh "$TAG"
+
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+        with:
+          subject-path: dist/${{ env.TAG }}.tar.gz
+
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "GE-Proton ${TAG%-Frontier*} with a DirectWrite fix for EVE Frontier's in-game browser (KEEP Monitor)."
+            echo "Not affiliated with GloriousEggroll; report problems here, not to GE."
+            echo
+            echo '### Install'
+            echo '```'
+            echo "tar -xf $TAG.tar.gz -C ~/.local/share/Steam/compatibilitytools.d/"
+            echo '```'
+            echo "Then pick **$TAG** as the Wine version in Lutris (Configure → Runner options), or as the compatibility tool in Steam."
+            echo
+            echo '### Verify'
+            echo '```'
+            echo "sha512sum -c $TAG.sha512sum"
+            echo "gh attestation verify $TAG.tar.gz --repo $GITHUB_REPOSITORY"
+            echo '```'
+            echo
+            echo '### Build info'
+            echo '```'
+            cat dist/BUILDINFO
+            echo '```'
+          } > dist/NOTES.md
+
+          assets=("dist/$TAG.tar.gz" "dist/$TAG.sha512sum")
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${assets[@]}" --clobber
+            gh release edit "$TAG" --notes-file dist/NOTES.md
+          else
+            gh release create "$TAG" "${assets[@]}" --draft --verify-tag \
+              --title "$TAG" --notes-file dist/NOTES.md
+          fi
